@@ -50,7 +50,10 @@ class CartController {
      * @returns A Promise that resolves to an array of carts belonging to the customer.
      * Only the carts that have been checked out should be returned, the current cart should not be included in the result.
      */
-    async getCustomerCarts(user: User) { } /**Promise<Cart[]> */
+    async getCustomerCarts(user: User): Promise<Cart[]> {
+        
+        return this.dao.getCustomerCart(user)
+    }
 
     /**
      * Removes one product unit from the current cart. In case there is more than one unit in the cart, only one should be removed.
@@ -58,7 +61,9 @@ class CartController {
      * @param product The model of the product to remove.
      * @returns A Promise that resolves to `true` if the product was successfully removed.
      */
-    async removeProductFromCart(user: User, product: string) /**Promise<Boolean> */ { }
+    async removeProductFromCart(user: User, product: string): Promise<Boolean> { 
+        return this.dao.removeProductFromCart(user,product)
+    }
 
 
     /**
@@ -78,7 +83,9 @@ class CartController {
      * Retrieves all carts in the database.
      * @returns A Promise that resolves to an array of carts.
      */
-    async getAllCarts() /*:Promise<Cart[]> */ { }
+    async getAllCarts():Promise<Cart[]>  {
+        return this.dao.getAllCarts()
+     }
 }
 
 export default CartController
