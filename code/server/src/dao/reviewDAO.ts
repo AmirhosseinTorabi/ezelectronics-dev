@@ -3,53 +3,49 @@ import {
   ExistingReviewError,
   NoReviewProductError,
 } from "../errors/reviewError";
+import { ProductNotFoundError } from "../errors/productError"
 import { ProductReview } from "../components/review";
 
 class ReviewDAO {
-  async addReview(
+  addReview(
     model: string,
-    user: string,
+    username: string,
     score: number,
+    date: string,
     comment: string
   ): Promise<void> {
-    return new Promise<void>(async (resolve, reject) => {
+    return new Promise<void>( (resolve, reject) => {
       try {
-        // Check if the user has already reviewed this product
-        const checkExistingReviewQuery =
-          "SELECT * FROM reviews WHERE model = ? AND user = ?";
+        
+        // Check if the product exists before attempting to delete it
+        const checkReviewQuery =
+          "SELECT model FROM product WHERE model = ?";
         db.get(
-          checkExistingReviewQuery,
-          [model, user],
+          checkReviewQuery,
+          [model],
           async (err: Error | null, row: any) => {
             if (err) {
               reject(err);
               return;
             }
 
-            if (row) {
-              reject(new ExistingReviewError()); // Review already exists
+            if (!row) {
+              reject(new ProductNotFoundError()); // No product found
               return;
             }
-
-            // If there's no existing review, add the new review to the database
-            const addReviewQuery =
-              "INSERT INTO reviews (model, user, score, comment) VALUES (?, ?, ?, ?)";
-            db.run(
-              addReviewQuery,
-              [model, user, score, comment],
-              async (err: Error | null) => {
-                if (err) {
-                  reject(err);
-                  return;
-                }
-                resolve(); // Review added successfully
+          const sql = "INSERT INTO review (model, username, score, date, comment) VALUES(?, ?, ?, ?, ?)"
+          db.run(sql, [model, username, score, date, comment], (err: Error | null) => {
+              if (err) {
+                  if (err.message.includes("UNIQUE constraint failed: review.model")) reject(new ExistingReviewError)
+                  reject(err)
+                
               }
-            );
-          }
-        );
-      } catch (error) {
-        reject(error);
-      }
+              resolve()
+          })
+      })
+    } catch (error) {
+        reject(error)
+    }
     });
   }
 
@@ -57,7 +53,7 @@ class ReviewDAO {
     return new Promise<ProductReview[]>(async (resolve, reject) => {
       try {
         // Retrieve all reviews for the given product model from the database
-        const getReviewsQuery = "SELECT * FROM reviews WHERE model = ?";
+        const getReviewsQuery = "SELECT model, username, score, date, comment FROM review WHERE model = ?";
         db.all(
           getReviewsQuery,
           [model],
@@ -67,17 +63,16 @@ class ReviewDAO {
               return;
             }
 
-            if (rows.length === 0) {
-              reject(new NoReviewProductError()); // No reviews found for the product
-              return;
-            }
-
-            const reviews: ProductReview[] = rows.map((row) => ({
-              model: row.model,
-              user: row.user,
-              score: row.score,
-              comment: row.comment,
-            }));
+            const reviews = rows.map(
+              (row) =>
+                new ProductReview(
+                  row.model,
+                  row.user,
+                  row.score,
+                  row.date,
+                  row.comment,
+                )
+            );
 
             resolve(reviews); // Reviews fetched successfully
           }
@@ -88,15 +83,15 @@ class ReviewDAO {
     });
   }
 
-  async deleteReview(model: string, user: string): Promise<void> {
+  async deleteReview(model: string, username: string): Promise<void> {
     return new Promise<void>(async (resolve, reject) => {
       try {
-        // Check if the review exists before attempting to delete it
+        // Check if the product exists before attempting to delete it
         const checkReviewQuery =
-          "SELECT * FROM reviews WHERE model = ? AND user = ?";
+          "SELECT model FROM product WHERE model = ?";
         db.get(
           checkReviewQuery,
-          [model, user],
+          [model],
           async (err: Error | null, row: any) => {
             if (err) {
               reject(err);
@@ -104,7 +99,7 @@ class ReviewDAO {
             }
 
             if (!row) {
-              reject(new NoReviewProductError()); // No review found for the product and user
+              reject(new ProductNotFoundError()); // No product found
               return;
             }
 
@@ -113,11 +108,15 @@ class ReviewDAO {
               "DELETE FROM reviews WHERE model = ? AND user = ?";
             db.run(
               deleteReviewQuery,
-              [model, user],
-              async (err: Error | null) => {
+              [model, username],
+              function (err) {
                 if (err) {
                   reject(err);
                   return;
+                }
+                if (this.changes == 0){
+                  reject (new NoReviewProductError())
+                  return
                 }
                 resolve(); // Review deleted successfully
               }
@@ -134,8 +133,8 @@ class ReviewDAO {
     return new Promise<void>(async (resolve, reject) => {
       try {
         // Check if there are any reviews for the product before attempting to delete them
-        const checkReviewsQuery = "SELECT * FROM reviews WHERE model = ?";
-        db.all(
+        const checkReviewsQuery = "SELECT model FROM product WHERE model = ?";
+        db.get(
           checkReviewsQuery,
           [model],
           async (err: Error | null, rows: any[]) => {
@@ -144,13 +143,13 @@ class ReviewDAO {
               return;
             }
 
-            if (rows.length === 0) {
-              reject(new NoReviewProductError()); // No reviews found for the product
+            if (!rows) {
+              reject(new ProductNotFoundError()); // product not found
               return;
             }
 
             // Delete all reviews for the given product model from the database
-            const deleteReviewsQuery = "DELETE FROM reviews WHERE model = ?";
+            const deleteReviewsQuery = "DELETE FROM review WHERE model = ?";
             db.run(deleteReviewsQuery, [model], async (err: Error | null) => {
               if (err) {
                 reject(err);
@@ -169,21 +168,8 @@ class ReviewDAO {
   async deleteAllReviews(): Promise<void> {
     return new Promise<void>(async (resolve, reject) => {
       try {
-        // Check if there are any reviews before attempting to delete them
-        const checkAllReviewsQuery = "SELECT COUNT(*) as count FROM reviews";
-        db.get(checkAllReviewsQuery, async (err: Error | null, row: any) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-
-          if (row.count === 0) {
-            reject(new NoReviewProductError()); // No reviews found
-            return;
-          }
-
           // Delete all reviews from the database
-          const deleteAllReviewsQuery = "DELETE FROM reviews";
+          const deleteAllReviewsQuery = "DELETE FROM review";
           db.run(deleteAllReviewsQuery, async (err: Error | null) => {
             if (err) {
               reject(err);
@@ -191,7 +177,7 @@ class ReviewDAO {
             }
             resolve(); // All reviews deleted successfully
           });
-        });
+        
       } catch (error) {
         reject(error);
       }
