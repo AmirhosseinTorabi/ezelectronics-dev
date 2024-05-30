@@ -3,6 +3,8 @@ import { User, Role } from "../components/user"
 import { Cart, ProductInCart } from "../components/cart"
 import { ProductNotFoundError, EmptyProductStockError, LowProductStockError } from "../errors/productError"
 import { CartNotFoundError, EmptyCartError, ProductNotInCartError } from "../errors/cartError"
+import { BlockList } from "net"
+import { rejects } from "assert"
 /**
  * A class that implements the interaction with the database for all cart-related operations.
  * You are free to implement any method you need here, as long as the requirements are satisfied.
@@ -372,6 +374,33 @@ class CartDAO {
             }catch(err){
                 reject(err)
             }
+            })
+        }
+
+
+        clearUserCart(user: User): Promise<Boolean>{
+            return new Promise( (resolve,reject) => {
+                try{
+                    const sql = "DELETE FROM cart WHERE username = ? AND paid = 'false'"
+                    db.run(sql, [user.username], function(err)  {
+                    if(err){
+                        reject(err)
+                        return
+                    }
+                    if(!this.changes){
+                        reject(new CartNotFoundError())
+                        return
+                    }
+                    const cart_insert = "INSERT INTO cart(payment_date,paid,total,username) VALUES('null','false',0,?)"
+                    db.run(cart_insert, [user.username], function (err) {
+                        if (err) {
+                            reject(err);
+                        } 
+                    })
+                })
+                }catch(err){
+
+                }
             })
         }
 }
