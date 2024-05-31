@@ -58,6 +58,20 @@ class ProductRoutes {
          */
         this.router.post(
             "/",
+            this.authenticator.isLoggedIn,
+      this.authenticator.isManager,
+      body("model").isString().notEmpty(),
+      body("category")
+        .isString()
+        .notEmpty()
+        .isIn(["Smartphone", "Laptop", "Appliance"]),
+      body("quantity").isNumeric().notEmpty().isInt({ gt: 0 }),
+      body("details").isString().optional(),
+      body("sellingPrice").isNumeric().notEmpty().isFloat({ gt: 0 }),
+      body("arrivalDate", "Invalid arrivalData").isDate({
+        format: "YYYY-MM-DD",
+      }),
+      this.errorHandler.validateRequest,
             (req: any, res: any, next: any) => this.controller.registerProducts(req.body.model, req.body.category, req.body.quantity, req.body.details, req.body.sellingPrice, req.body.arrivalDate)
                 .then(() => res.status(200).end())
                 .catch((err) => next(err))
@@ -74,6 +88,15 @@ class ProductRoutes {
          */
         this.router.patch(
             "/:model",
+            this.authenticator.isLoggedIn,
+      this.authenticator.isManager,
+      param("model", "Invalid model").isString().notEmpty(),
+      body("quantity", "Invalid quantity")
+        .isNumeric()
+        .notEmpty()
+        .isInt({ gt: 0 }),
+      body("changeDate", "Invalid changeDate").isDate({ format: "YYYY-MM-DD" }),
+      this.errorHandler.validateRequest,
             (req: any, res: any, next: any) => this.controller.changeProductQuantity(req.params.model, req.body.quantity, req.body.changeDate)
                 .then((quantity: any /**number */) => res.status(200).json({ quantity: quantity }))
                 .catch((err) => next(err))
@@ -90,6 +113,17 @@ class ProductRoutes {
          */
         this.router.patch(
             "/:model/sell",
+            this.authenticator.isLoggedIn,
+      this.authenticator.isManager,
+      param("model", "Invalid model").isString().notEmpty(),
+      body("quantity", "Invalid quantity")
+        .isNumeric()
+        .notEmpty()
+        .isInt({ gt: 0 }),
+      body("sellingDate", "Invalid sellingDate").isDate({
+        format: "YYYY-MM-DD",
+      }),
+      this.errorHandler.validateRequest,
             (req: any, res: any, next: any) => this.controller.sellProduct(req.params.model, req.body.quantity, req.body.sellingDate)
                 .then((quantity: any /**number */) => res.status(200).json({ quantity: quantity }))
                 .catch((err) => {
@@ -110,11 +144,19 @@ class ProductRoutes {
         this.router.get(
             "/",
             this.authenticator.isLoggedIn,
-            this.authenticator.isAdminOrManager,
-            query("grouping").optional().isString().notEmpty().isIn(["category","model"]),
-            query("category").optional().isString().notEmpty().isIn(["Smartphone", "Laptop", "Appliance"]),
-            query("model").optional().isString().notEmpty(),
-            this.errorHandler.validateRequest,
+      this.authenticator.isAdminOrManager,
+      query("grouping")
+        .optional()
+        .isString()
+        .notEmpty()
+        .isIn(["category", "model"]),
+      query("category")
+        .optional()
+        .isString()
+        .notEmpty()
+        .isIn(["Smartphone", "Laptop", "Appliance"]),
+      query("model").optional().isString().notEmpty(),
+      this.errorHandler.validateRequest,
             (req: any, res: any, next: any) => this.controller.getProducts(req.query.grouping, req.query.category, req.query.model)
                 .then((products: any /*Product[]*/) => res.status(200).json(products))
                 .catch((err) => {
@@ -134,6 +176,20 @@ class ProductRoutes {
          */
         this.router.get(
             "/available",
+            this.authenticator.isLoggedIn,
+      this.authenticator.isCustomer,
+      query("grouping")
+        .optional()
+        .isString()
+        .notEmpty()
+        .isIn(["category", "model"]),
+      query("category")
+        .optional()
+        .isString()
+        .notEmpty()
+        .isIn(["Smartphone", "Laptop", "Appliance"]),
+      query("model").optional().isString().notEmpty(),
+      this.errorHandler.validateRequest,
             (req: any, res: any, next: any) => this.controller.getAvailableProducts(req.query.grouping, req.query.category, req.query.model)
                 .then((products: any/*Product[]*/) => res.status(200).json(products))
                 .catch((err) => next(err))
@@ -146,6 +202,9 @@ class ProductRoutes {
          */
         this.router.delete(
             "/",
+            this.authenticator.isLoggedIn,
+      this.authenticator.isAdminOrManager,
+      this.errorHandler.validateRequest,
             (req: any, res: any, next: any) => this.controller.deleteAllProducts()
                 .then(() => res.status(200).end())
                 .catch((err: any) => next(err))
@@ -159,6 +218,10 @@ class ProductRoutes {
          */
         this.router.delete(
             "/:model",
+            this.authenticator.isLoggedIn,
+      this.authenticator.isAdminOrManager,
+      param("model", "Invalid model").isString().notEmpty(),
+      this.errorHandler.validateRequest,
             (req: any, res: any, next: any) => this.controller.deleteProduct(req.params.model)
                 .then(() => res.status(200).end())
                 .catch((err: any) => next(err))
